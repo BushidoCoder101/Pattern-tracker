@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pattern Trace Challenge</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            touch-action: none;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 400px;
+            max-height: 400px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        
+        #pattern-display {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        #drawing-canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        #score-display {
+            margin-top: 15px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        #level-display {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 5px;
+            font-size: 20px;
+            display: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="pattern-display"></canvas>
+        <canvas id="drawing-canvas"></canvas>
+        <div id="level-display">Level: 1</div>
+        <div id="message"></div>
+    </div>
+    <div id="controls">
+        <button id="check-btn">Check</button>
+        <button id="new-btn">New Pattern</button>
+        <button id="clear-btn">Clear</button>
+    </div>
+    <div id="score-display">Score: 0</div>
+
+    <script>
+        // Game elements
+        const patternCanvas = document.getElementById('pattern-display');
+        const patternCtx = patternCanvas.getContext('2d');
+        const drawingCanvas = document.getElementById('drawing-canvas');
+        const drawingCtx = drawingCanvas.getContext('2d');
+        const checkBtn = document.getElementById('check-btn');
+        const newBtn = document.getElementById('new-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const scoreDisplay = document.getElementById('score-display');
+        const levelDisplay = document.getElementById('level-display');
+        const messageElement = document.getElementById('message');
+        
+        // Game state
+        let score = 0;
+        let level = 1;
+        let patternPoints = [];
+        let userPoints = [];
+        let isDrawing = false;
+        let patternComplete = false;
+        
+        // Set canvas sizes
+        function resizeCanvases() {
+            const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.7, 400);
+            patternCanvas.width = size;
+            patternCanvas.height = size;
+            drawingCanvas.width = size;
+            drawingCanvas.height = size;
+        }
+        
+        // Initialize game
+        function initGame() {
+            resizeCanvases();
+            generatePattern();
+            setupDrawing();
+            updateUI();
+        }
+        
+        // Generate a random pattern
+        function generatePattern() {
+            patternPoints = [];
+            userPoints = [];
+            patternComplete = false;
+            
+            // Clear canvases
+            patternCtx.clearRect(0, 0, patternCanvas.width, patternCanvas.height);
+            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            
+            // Determine pattern complexity based on level
+            const numPoints = Math.min(3 + Math.floor(level / 2), 8);
+            const centerX = patternCanvas.width / 2;
+            const centerY = patternCanvas.height / 2;
+            const maxRadius = patternCanvas.width * 0.4;
+            
+            // Generate points in a circular pattern
+            for (let i = 0; i < numPoints; i++) {
+                const angle = (i / numPoints) * Math.PI * 2;
+                // Add some randomness to the radius and angle
+                const radius = maxRadius * (0.7 + Math.random() * 0.3);
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                patternPoints.push({x, y});
+            }
+            
+            // Draw the pattern
+            patternCtx.strokeStyle = '#3498db';
+            patternCtx.lineWidth = 4;
+            patternCtx.lineJoin = 'round';
+            patternCtx.lineCap = 'round';
+            
+            patternCtx.beginPath();
+            patternCtx.moveTo(patternPoints[0].x, patternPoints[0].y);
+            
+            for (let i = 1; i < patternPoints.length; i++) {
+                patternCtx.lineTo(patternPoints[i].x, patternPoints[i].y);
+            }
+            
+            // Close the path if level is high enough
+            if (level > 3) {
+                patternCtx.closePath();
+            }
+            
+            patternCtx.stroke();
+            
+            // Draw circles at each point
+            patternCtx.fillStyle = '#e74c3c';
+            for (const point of patternPoints) {
+                patternCtx.beginPath();
+                patternCtx.arc(point.x, point.y, 8, 0, Math.PI * 2);
+                patternCtx.fill();
+            }
+        }
+        
+        // Set up drawing functionality
+        function setupDrawing() {
+            let isTouchDevice = 'ontouchstart' in window;
+            
+            // Start drawing
+            const startDrawing = (e) => {
+                if (patternComplete) return;
+                
+                isDrawing = true;
+                const pos = getPosition(e);
+                userPoints = [{x: pos.x, y: pos.y}];
+                
+                drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+                drawingCtx.beginPath();
+                drawingCtx.moveTo(pos.x, pos.y);
+                
+                // Draw first point
+                drawingCtx.fillStyle = '#2ecc71';
+                drawingCtx.beginPath();
+                drawingCtx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+                drawingCtx.fill();
+                
+                drawingCtx.strokeStyle = '#2ecc71';
+                drawingCtx.lineWidth = 4;
+                drawingCtx.lineJoin = 'round';
+                drawingCtx.lineCap = 'round';
+            };
+            
+            // Continue drawing
+            const continueDrawing = (e) => {
+                if (!isDrawing || patternComplete) return;
+                
+                const pos = getPosition(e);
+                userPoints.push({x: pos.x, y: pos.y});
+                
+                drawingCtx.lineTo(pos.x, pos.y);
+                drawingCtx.stroke();
+                
+                // Draw current point
+                drawingCtx.fillStyle = '#2ecc71';
+                drawingCtx.beginPath();
+                drawingCtx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+                drawingCtx.fill();
+                
+                // Redraw the line
+                drawingCtx.beginPath();
+                if (userPoints.length > 1) {
+                    drawingCtx.moveTo(userPoints[0].x, userPoints[0].y);
+                    for (let i = 1; i < userPoints.length; i++) {
+                        drawingCtx.lineTo(userPoints[i].x, userPoints[i].y);
+                    }
+                }
+                drawingCtx.stroke();
+            };
+            
+            // End drawing
+            const endDrawing = () => {
+                isDrawing = false;
+            };
+            
+            // Get position from event (touch or mouse)
+            function getPosition(e) {
+                const rect = drawingCanvas.getBoundingClientRect();
+                let x, y;
+                
+                if (isTouchDevice && e.touches) {
+                    x = e.touches[0].clientX - rect.left;
+                    y = e.touches[0].clientY - rect.top;
+                } else {
+                    x = e.clientX - rect.left;
+                    y = e.clientY - rect.top;
+                }
+                
+                return {x, y};
+            }
+            
+            // Event listeners for both mouse and touch
+            drawingCanvas.addEventListener('mousedown', startDrawing);
+            drawingCanvas.addEventListener('mousemove', continueDrawing);
+            drawingCanvas.addEventListener('mouseup', endDrawing);
+            drawingCanvas.addEventListener('mouseleave', endDrawing);
+            
+            drawingCanvas.addEventListener('touchstart', startDrawing);
+            drawingCanvas.addEventListener('touchmove', continueDrawing);
+            drawingCanvas.addEventListener('touchend', endDrawing);
+        }
+        
+        // Check if the user's drawing matches the pattern
+        function checkPattern() {
+            if (userPoints.length < 2 || patternComplete) return;
+            
+            // Simple check - compare point sequences
+            // In a real game, you'd want a more sophisticated pattern matching algorithm
+            const tolerance = drawingCanvas.width * 0.1;
+            let matchedPoints = 0;
+            
+            for (const patternPoint of patternPoints) {
+                for (const userPoint of userPoints) {
+                    const dx = patternPoint.x - userPoint.x;
+                    const dy = patternPoint.y - userPoint.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < tolerance) {
+                        matchedPoints++;
+                        break;
+                    }
+                }
+            }
+            
+            // Determine if the pattern is matched
+            const matchThreshold = patternPoints.length * 0.7; // 70% of points need to match
+            if (matchedPoints >= matchThreshold) {
+                patternComplete = true;
+                score += level * 10;
+                level++;
+                showMessage("Success! Pattern matched!");
+                updateUI();
+                
+                // Generate new pattern after delay
+                setTimeout(() => {
+                    generatePattern();
+                    updateUI();
+                }, 1500);
+            } else {
+                showMessage("Try again! Doesn't match.", true);
+            }
+        }
+        
+        // Show a message to the player
+        function showMessage(text, isError = false) {
+            messageElement.textContent = text;
+            messageElement.style.backgroundColor = isError ? 'rgba(231, 76, 60, 0.8)' : 'rgba(46, 204, 113, 0.8)';
+            messageElement.style.display = 'block';
+            
+            setTimeout(() => {
+                messageElement.style.display = 'none';
+            }, 1500);
+        }
+        
+        // Update UI elements
+        function updateUI() {
+            scoreDisplay.textContent = `Score: ${score}`;
+            levelDisplay.textContent = `Level: ${level}`;
+            checkBtn.disabled = patternComplete || userPoints.length < 2;
+        }
+        
+        // Clear the drawing
+        function clearDrawing() {
+            userPoints = [];
+            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            updateUI();
+        }
+        
+        // Event listeners for buttons
+        checkBtn.addEventListener('click', checkPattern);
+        newBtn.addEventListener('click', () => {
+            level = Math.max(1, level - 1); // Decrease level if they ask for new pattern
+            generatePattern();
+            updateUI();
+        });
+        clearBtn.addEventListener('click', clearDrawing);
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            resizeCanvases();
+            generatePattern();
+        });
+        
+        // Start the game
+        initGame();
+    </script>
+</body>
+</html>
