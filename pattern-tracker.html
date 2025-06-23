@@ -262,6 +262,7 @@
             // End drawing
             const endDrawing = () => {
                 isDrawing = false;
+                updateUI();
             };
             
             // Get position from event (touch or mouse)
@@ -295,11 +296,12 @@
         function checkPattern() {
             if (userPoints.length < 2 || patternComplete) return;
             
-            // Simple check - compare point sequences
-            // In a real game, you'd want a more sophisticated pattern matching algorithm
-            const tolerance = drawingCanvas.width * 0.1;
+            // Improved pattern matching algorithm
+            const tolerance = drawingCanvas.width * 0.15; // 15% of canvas width as tolerance
             let matchedPoints = 0;
+            let directionMatches = 0;
             
+            // 1. Check if user drew through all key points
             for (const patternPoint of patternPoints) {
                 for (const userPoint of userPoints) {
                     const dx = patternPoint.x - userPoint.x;
@@ -313,9 +315,24 @@
                 }
             }
             
+            // 2. Check overall shape similarity (direction changes)
+            const patternDirections = calculateDirectionChanges(patternPoints);
+            const userDirections = calculateDirectionChanges(userPoints);
+            
+            const directionTolerance = 0.5; // radians
+            const compareLength = Math.min(patternDirections.length, userDirections.length);
+            
+            for (let i = 0; i < compareLength; i++) {
+                if (Math.abs(patternDirections[i] - userDirections[i]) < directionTolerance) {
+                    directionMatches++;
+                }
+            }
+            
             // Determine if the pattern is matched
-            const matchThreshold = patternPoints.length * 0.7; // 70% of points need to match
-            if (matchedPoints >= matchThreshold) {
+            const pointsThreshold = patternPoints.length * 0.7; // 70% of key points
+            const directionsThreshold = compareLength * 0.6; // 60% of direction changes
+            
+            if (matchedPoints >= pointsThreshold && directionMatches >= directionsThreshold) {
                 patternComplete = true;
                 score += level * 10;
                 level++;
@@ -330,6 +347,19 @@
             } else {
                 showMessage("Try again! Doesn't match.", true);
             }
+        }
+        
+        // Calculate direction changes between points
+        function calculateDirectionChanges(points) {
+            const directions = [];
+            
+            for (let i = 1; i < points.length; i++) {
+                const dx = points[i].x - points[i-1].x;
+                const dy = points[i].y - points[i-1].y;
+                directions.push(Math.atan2(dy, dx));
+            }
+            
+            return directions;
         }
         
         // Show a message to the player
